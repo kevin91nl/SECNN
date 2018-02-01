@@ -8,7 +8,7 @@ The input for the model consists of a collection of JSON files. Each of the JSON
 
 ### JSON structure
 
-The minimum requirements for the JSON files are that they have `text` field. In that case, the JSON file looks like the following:
+The minimum requirements for the JSON files are that they have a `text` field. In that case, the JSON file looks like the following:
 
 ```
 {
@@ -16,7 +16,7 @@ The minimum requirements for the JSON files are that they have `text` field. In 
 }
 ```
 
-When the JSON is used for training and testing, information about entity salience should be given. The structure should contain a `salient_entities` field which has a list as its value containing mentions of the entities that are salient. The JSON files used for training and testing are similar to the following example:
+When the JSON file is used for training and testing, information about entity salience should be given. The structure should contain a `salient_entities` field which has a list as its value containing mentions of the entities that are salient. The JSON files used for training and testing are similar to the following example:
 
 ```
 {
