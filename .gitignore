@@ -108,3 +108,6 @@ venv.bak/
 
 # Configuration
 settings.ini
+
+# Private scripts
+_*.py

@@ -12,7 +12,7 @@ The minimum requirements for the JSON files are that they have a `text` field. I
 
 ```
 {
-    'text': 'This is a document. The document contains sentences.'
+    "text": "This is a document. The document contains sentences."
 }
 ```
 
@@ -20,8 +20,8 @@ When the JSON file is used for training and testing, information about entity sa
 
 ```
 {
-    'text': 'This is a document about cats and dogs. Dogs are animals and cats too.',
-    'salient_entities': ['dogs', 'cats']
+    "text": "This is a document about cats and dogs. Dogs are animals and cats too.",
+    "salient_entities": ["dogs", "cats"]
 }
 ```
 
@@ -31,4 +31,4 @@ This is the basic structure of the input files. There are required preprocessing
 
 ## Preprocessing
 
-The preprocessing of the input data consists of several steps. First, NLP annotations are added to the data. Then, entity alignment is applied whenever salient entities are specified. With the alignment, each of the specified salient entities are aligned with the entities found by the NLP pipeline. First, NLP annotations are added. This is done using the Stanford CoreNLP pipeline. Here, version 3.8.0 is used. The `preprocessing.py` script adds first an `nlp_annotations` field to the given JSON files. Before this script is called, make sure that the Stanford CoreNLP server runs on port `http://localhost:9000/` (or on a different URL/port and by changing the `corenlp_url` argument of the preprocessing script). When the `nlp_annotations` are added and when salient entities are specified in the `salient_entities` field, then entity alignments are made and stored in the `aligned_entities` field, which is a mapping from salient entities to the entities found by the NLP pipeline.
+The preprocessing of the input data consists of several steps. First, NLP annotations are added to the data. Then, entity alignment is applied whenever salient entities are specified. With the alignment, each of the specified salient entities are aligned with the entities found by the NLP pipeline. First, NLP annotations are added. This is done using the Stanford CoreNLP pipeline. Here, version 3.8.0 is used. The `preprocessing.py` script adds first an `nlp_annotations` field to the given JSON files. Before this script is called, make sure that the Stanford CoreNLP server runs on port `http://localhost:9000` (or on a different URL/port and by changing the `corenlp_url` argument of the preprocessing script). When the `nlp_annotations` are added and when salient entities are specified in the `salient_entities` field, then entity alignments are made and stored in the `aligned_entities` field, which is a mapping from salient entities to the entities found by the NLP pipeline.
