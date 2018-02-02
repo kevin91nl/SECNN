@@ -16,18 +16,19 @@ The minimum requirements for the JSON files are that they have a `text` field. I
 }
 ```
 
-When the JSON file is used for training and testing, information about entity salience should be given. The structure should contain a `salient_entities` field which has a list as its value containing mentions of the entities that are salient. The JSON files used for training and testing are similar to the following example:
+When the JSON file is used for training and testing, information about entity salience should be given. The structure should contain a `salient_entities` field which has a list as its value containing mentions of the entities that are salient. Besides that, it should contain a `nonsalient_entities` field which has a list as its value containing the mentions of the entities that are non-salient. The JSON files used for training and testing are similar to the following example:
 
 ```
 {
     "text": "This is a document about cats and dogs. Dogs are animals and cats too.",
-    "salient_entities": ["dogs", "cats"]
+    "salient_entities": ["dogs", "cats"],
+    "nonsalient_entities": ["document"]
 }
 ```
 
 More information is better. An optional field is the `title` field which should contain the title of the document when this information is available.
 
-This is the basic structure of the input files. There are required preprocessing steps which add extra information to the JSON files but do not modify the required fields.
+This is the basic structure of the input files. There are required preprocessing steps which add extra information to the JSON files but it will not modify the existing fields.
 
 ## Preprocessing
 

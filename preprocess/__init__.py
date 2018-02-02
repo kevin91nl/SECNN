@@ -129,7 +129,7 @@ def remove_empty_tokens(tokens):
     return [token for token in tokens if len(token['word']) > 0]
 
 
-def replace_entities(tokens, allowed_entity_types=None, entity_id=1):
+def replace_entities(tokens, allowed_entity_types=None, excluded_entity_types=None, entity_id=1):
     """Replace entities by entity markers
 
     Parameters
@@ -138,8 +138,11 @@ def replace_entities(tokens, allowed_entity_types=None, entity_id=1):
         Tokens found by the corenlp_to_tokens method.
 
     allowed_entity_types : list, optional
-        A list of all NER types that are used for the replacement. All other NER types are ignored. The default is
-        ['LOCATION', 'ORGANIZATION', 'PERSON', 'MISC'].
+        A list of all NER types that are used for the replacement. The default is None, meaning that all types are
+        allowed (except the excluded ones).
+
+    excluded_entity_types : list, optional
+        A list of all NER types that are ignored for the replacement.
 
     entity_id : int, optional
         The entity index to start with (default: 1).
@@ -153,11 +156,12 @@ def replace_entities(tokens, allowed_entity_types=None, entity_id=1):
     int
         The maximum found entity index.
     """
-    allowed_entity_types = allowed_entity_types if allowed_entity_types is not None else ['LOCATION', 'ORGANIZATION',
-                                                                                          'PERSON', 'MISC']
     tokens = list(tokens)
     entities = get_entities(tokens)
-    entities = [entity for entity in entities if len(entity) > 0 and entity[0]['ner'] in allowed_entity_types]
+    entities = [entity for entity in entities if
+                len(entity) > 0 and
+                (allowed_entity_types is None or entity[0]['ner'] in allowed_entity_types) and
+                (excluded_entity_types is None or entity[0]['ner'] not in excluded_entity_types)]
     max_entity_id = entity_id
     for entity in entities:
         max_entity_id = entity_id
