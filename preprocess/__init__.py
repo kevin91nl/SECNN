@@ -113,18 +113,6 @@ def tokens_to_text(tokens):
     return ' '.join([token['word'] for token in tokens])
 
 
-def replace_entities(results, entities, tokens):
-    current_id = 1
-    for cluster in results['corefs']:
-        for item in results['corefs'][cluster]:
-            label = '@%s%d' % ('entity', current_id)
-            for token_index, token in enumerate(tokens):
-                if item['startIndex'] <= token['index'] < item['endIndex'] and token['sentence'] == item['sentNum']:
-                    tokens[token_index]['word'] = label if token['index'] == item['startIndex'] else ''
-        current_id += 1
-    return tokens
-
-
 def remove_empty_tokens(tokens):
     """Remove tokens with an empty word field.
 
