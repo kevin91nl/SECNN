@@ -127,3 +127,92 @@ def remove_empty_tokens(tokens):
         List of tokens where empty tokens are removed.
     """
     return [token for token in tokens if len(token['word']) > 0]
+
+
+def replace_entities(tokens, allowed_entity_types=None, entity_id=1):
+    """Replace entities by entity markers
+
+    Parameters
+    ----------
+    tokens : list
+        Tokens found by the corenlp_to_tokens method.
+
+    allowed_entity_types : list, optional
+        A list of all NER types that are used for the replacement. All other NER types are ignored. The default is
+        ['LOCATION', 'ORGANIZATION', 'PERSON', 'MISC'].
+
+    entity_id : int, optional
+        The entity index to start with (default: 1).
+
+    Returns
+    -------
+    list
+        List of tokens in which the head token of an entity is replaced by an entity marker ("@entity...") and the
+        remaining entity tokens are emptied. The entity marker head token also gets an additional field "entity" which
+        is the text of entity mention.
+    int
+        The maximum found entity index.
+    """
+    allowed_entity_types = allowed_entity_types if allowed_entity_types is not None else ['LOCATION', 'ORGANIZATION',
+                                                                                          'PERSON', 'MISC']
+    tokens = list(tokens)
+    entities = get_entities(tokens)
+    entities = [entity for entity in entities if len(entity) > 0 and entity[0]['ner'] in allowed_entity_types]
+    max_entity_id = entity_id
+    for entity in entities:
+        max_entity_id = entity_id
+        label = '@entity%d' % entity_id
+        start_index = entity[0]['index']
+        end_index = entity[-1]['index']
+        sentence = entity[0]['sentence']
+        for token_index, token in enumerate(tokens):
+            if start_index <= token['index'] <= end_index and token['sentence'] == sentence:
+                if token['index'] == start_index:
+                    tokens[token_index]['entity'] = tokens_to_text(entity)
+                tokens[token_index]['word'] = label if token['index'] == start_index else ''
+        entity_id += 1
+
+    return tokens, max_entity_id
+
+
+def replace_corefs(corenlp_data, tokens, entity_id):
+    """Replace entities by entity markers
+
+    Parameters
+    ----------
+    corenlp_data : dict
+        The output of the Stanford CoreNLP client.
+
+    tokens : list
+        Tokens found by the corenlp_to_tokens method..
+
+    entity_id : int, optional
+        The entity index to start with (default: 1).
+
+    Returns
+    -------
+    list
+        List of tokens in which the head token of an entity is replaced by an entity marker ("@entity...") and the
+        remaining entity tokens are emptied. The entity marker head token also gets an additional field "entity" which
+        is the text of entity mention. Entities from the same coreference resolution cluster are assigned the same
+        label.
+    int
+        The maximum found entity index.
+    """
+    max_entity_id = entity_id
+    tokens = list(tokens)
+    for cluster in corenlp_data['corefs']:
+        max_entity_id = entity_id
+        for entity in corenlp_data['corefs'][cluster]:
+            start_index = entity['startIndex']
+            end_index = entity['endIndex']
+            sentence = entity['sentNum']
+            label = '@%s%d' % ('entity', entity_id)
+            for token_index, token in enumerate(tokens):
+                if start_index <= token['index'] < end_index and token['sentence'] == sentence:
+                    if token['index'] == start_index:
+                        tokens[token_index]['entity'] = tokens_to_text(entity)
+                    tokens[token_index]['word'] = label if token['index'] == entity['startIndex'] else ''
+        entity_id += 1
+
+    return tokens, max_entity_id
