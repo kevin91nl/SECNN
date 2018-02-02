@@ -122,9 +122,6 @@ def replace_entities(results, entities, tokens):
                 if item['startIndex'] <= token['index'] < item['endIndex'] and token['sentence'] == item['sentNum']:
                     tokens[token_index]['word'] = label if token['index'] == item['startIndex'] else ''
         current_id += 1
-
-    print(entities)
-
     return tokens
 
 
@@ -142,4 +139,3 @@ def remove_empty_tokens(tokens):
         List of tokens where empty tokens are removed.
     """
     return [token for token in tokens if len(token['word']) > 0]
-
