@@ -1,7 +1,8 @@
 import argparse
-import os
-from tqdm import tqdm
 import json
+import os
+
+from tqdm import tqdm
 
 from preprocess import StanfordCoreNLPClient
 
@@ -34,10 +35,6 @@ if __name__ == '__main__':
         if file_data is None:
             continue
 
-        ####################################
-        # Phase 1a: Enrich with NLP data.  #
-        ####################################
-
         # Check for the nlp_data field
         if 'nlp_data' not in file_data:
             # Apply the Stanford CoreNLP pipeline to the text field
@@ -46,14 +43,6 @@ if __name__ == '__main__':
 
             # Set the field
             file_data['nlp_data'] = nlp_data
-
-        ####################################
-        # Phase 1b: Simplify the NLP data. #
-        ####################################
-
-        ####################################
-        # Phase 2: Align the entities.     #
-        ####################################
 
         # Store the data
         with open(path, 'w') as file_handle:
