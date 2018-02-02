@@ -1,6 +1,5 @@
 import argparse
 import os
-
 import requests
 from tqdm import tqdm
 import json
@@ -8,16 +7,36 @@ from urllib.parse import urlencode
 
 
 class StanfordCoreNLPClient:
+    """A client for the Stanford CoreNLP server."""
 
     def __init__(self, corenlp_base_url):
+        """Initialize the Stanford CoreNLP client.
+
+        Parameters
+        ----------
+        corenlp_base_url : str
+            The URL to the Stanford CoreNLP server.
+        """
         self.session = requests.Session()
         self.corenlp_base_url = corenlp_base_url
 
     def __call__(self, text):
+        """Query the Stanford CoreNLP server with text.
+
+        Parameters
+        ----------
+        text : str
+            Text to run the Stanford CoreNLP server for.
+
+        Returns
+        -------
+        dict
+            The JSON output of the Stanford CoreNLP server.
+        """
         query = {
             "properties": {
                 "annotators": "tokenize,ssplit,pos,ner,coref",
-                "timeout": 50000,
+                "timeout": 20000,
             },
             "pipelineLanguage": "en"
         }
@@ -51,19 +70,31 @@ if __name__ == '__main__':
         with open(path, 'r') as file_handle:
             file_data = json.load(file_handle)
 
-        # Skip if the file is not loaded
+        # Skip if the file could not be loaded
         if file_data is None:
             continue
 
-        # Skip if the NLP data is already set
-        if 'nlp_data' in file_data:
-            continue
+        ####################################
+        # Phase 1a: Enrich with NLP data.  #
+        ####################################
 
-        # Apply the Stanford CoreNLP pipeline
-        file_text = file_data.get('text')
-        nlp_data = corenlp_client(file_text)
+        # Check for the nlp_data field
+        if 'nlp_data' not in file_data:
+            # Apply the Stanford CoreNLP pipeline to the text field
+            file_text = file_data.get('text')
+            nlp_data = corenlp_client(file_text)
+
+            # Set the field
+            file_data['nlp_data'] = nlp_data
+
+        ####################################
+        # Phase 1b: Simplify the NLP data. #
+        ####################################
+
+        ####################################
+        # Phase 2: Align the entities.     #
+        ####################################
 
         # Store the data
-        file_data['nlp_data'] = nlp_data
         with open(path, 'w') as file_handle:
             json.dump(file_data, file_handle)
