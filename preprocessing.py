@@ -1,49 +1,9 @@
 import argparse
 import os
-import requests
 from tqdm import tqdm
 import json
-from urllib.parse import urlencode
 
-
-class StanfordCoreNLPClient:
-    """A client for the Stanford CoreNLP server."""
-
-    def __init__(self, corenlp_base_url):
-        """Initialize the Stanford CoreNLP client.
-
-        Parameters
-        ----------
-        corenlp_base_url : str
-            The URL to the Stanford CoreNLP server.
-        """
-        self.session = requests.Session()
-        self.corenlp_base_url = corenlp_base_url
-
-    def __call__(self, text):
-        """Query the Stanford CoreNLP server with text.
-
-        Parameters
-        ----------
-        text : str
-            Text to run the Stanford CoreNLP server for.
-
-        Returns
-        -------
-        dict
-            The JSON output of the Stanford CoreNLP server.
-        """
-        query = {
-            "properties": {
-                "annotators": "tokenize,ssplit,pos,ner,coref",
-                "timeout": 20000,
-            },
-            "pipelineLanguage": "en"
-        }
-        url = '%s/?%s' % (self.corenlp_base_url, urlencode(query))
-        response = self.session.post(url, text)
-        return json.loads(response.text)
-
+from preprocess import StanfordCoreNLPClient
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
