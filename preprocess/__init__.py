@@ -142,3 +142,4 @@ def remove_empty_tokens(tokens):
         List of tokens where empty tokens are removed.
     """
     return [token for token in tokens if len(token['word']) > 0]
+
