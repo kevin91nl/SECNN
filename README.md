@@ -1,6 +1,6 @@
 # Salient Entity Classifier Neural Network (SECNN)
 
-This repository is the implementation of the Salient Entity Classifier Neural Network (SECNN) model. The script is writting in Python 3.6.1.
+This repository is the implementation of the Salient Entity Classifier Neural Network (SECNN) model. The script is written using Python 3.6.1.
 
 ## Model input
 
