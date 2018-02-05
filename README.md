@@ -28,8 +28,10 @@ When the JSON file is used for training and testing, information about entity sa
 
 More information is better. An optional field is the `title` field which should contain the title of the document when this information is available.
 
-This is the basic structure of the input files. There are required preprocessing steps which add extra information to the JSON files but it will not modify the existing fields.
+This is the basic structure of the input files. There are required preprocessing steps which add additional information to the JSON files but it will not modify the existing fields.
 
 ## Preprocessing
 
-One required preprocessing step is annotating the data with the annotations found by the Stanford CorenLP package. This is done by executing the `preprocessing.py` script. As input, it needs the path to the folder in which the JSON files are stored. It will not modify the existing fields, but only add the annotations in the `nlp_data` field. Make sure that the Stanford CoreNLP server is running. If the server is running on a different URL than `http://localhost:9000`, make sure to adjust the `corenlp_url` argument of the script accordingly.
+### NLP pipeline
+
+One required preprocessing step is annotating the data with the annotations found by the Stanford CorenLP package. This is done by executing the `preprocess_nlp.py` script. As input, it needs the path to the folder in which the JSON files are stored. It will not modify the existing fields, but only add the annotations in the `nlp_data` field. Make sure that the Stanford CoreNLP server is running. If the server is running on a different URL than `http://localhost:9000`, make sure to adjust the `corenlp_url` argument of the script accordingly.

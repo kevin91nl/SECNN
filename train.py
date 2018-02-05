@@ -1,5 +1,9 @@
 import argparse
+import csv
 import os
+
+import numpy as np
+import pandas as pd
 
 from preprocess import *
 
@@ -8,7 +12,35 @@ if __name__ == '__main__':
         description='Train the SECNN model on the given preprocessed input files.')
     parser.add_argument('input',
                         help='Path to the input files (folder containing preprocessed JSON files).')
+    parser.add_argument('glove_file',
+                        help='Path to the GloVe word embeddings file.')
     args = parser.parse_args()
+
+    ########################
+    # Load word embeddings #
+    ########################
+
+    # Load the GloVe file
+    df_words = pd.read_table(args.glove_file, sep=' ', index_col=0, header=None, quoting=csv.QUOTE_NONE)
+
+    # Load the vocabulary and the weight matrix
+    VOCAB_WORDS = df_words.index.values.tolist()
+    W_words = df_words.values
+    words_count, words_dim = W_words.shape
+
+    # Initialize vectors for the <PAD> (zeros) and <UNK> (initialized using Xavier initializer) markers
+    xavier_bound = np.sqrt(6.) / np.sqrt(words_count + words_dim)
+    markers_matrix = [np.zeros((1, words_dim))]
+    markers_matrix += [np.random.uniform(-xavier_bound, xavier_bound, (1, words_dim))]
+    markers_matrix = np.vstack(markers_matrix)
+
+    # Augment the word vocabulary with the markers
+    VOCAB_WORDS = ['<PAD>', '<UNK>'] + VOCAB_WORDS
+    W_words = np.vstack([markers_matrix, W_words])
+
+    #########################
+    # Load train/test files #
+    #########################
 
     files = os.listdir(args.input)
     for file in files[:1]:
@@ -16,6 +48,7 @@ if __name__ == '__main__':
         with open(path, 'r') as file_handle:
             data = json.load(file_handle)
 
+            # Preprocess the data
             tokens = corenlp_to_tokens(data['nlp_data'])
             entities = get_entities(tokens)
             entities = align_entities(data['salient_entities'] + data['nonsalient_entities'], entities)
