@@ -8,3 +8,4 @@ nltk==3.2.5
 requests==2.18.4
 progressbar2==3.34.3
 tqdm==4.19.5
+unidecode==1.0.22

@@ -1,7 +1,9 @@
 import json
+import re
 from urllib.parse import urlencode
 
 import requests
+import unidecode
 
 
 class StanfordCoreNLPClient:
@@ -129,7 +131,7 @@ def remove_empty_tokens(tokens):
     return [token for token in tokens if len(token['word']) > 0]
 
 
-def replace_entities(tokens, allowed_entity_types=None, excluded_entity_types=None, entity_id=1):
+def replace_entities(tokens, entities):
     """Replace entities by entity markers
 
     Parameters
@@ -137,15 +139,9 @@ def replace_entities(tokens, allowed_entity_types=None, excluded_entity_types=No
     tokens : list
         Tokens found by the corenlp_to_tokens method.
 
-    allowed_entity_types : list, optional
-        A list of all NER types that are used for the replacement. The default is None, meaning that all types are
-        allowed (except the excluded ones).
-
-    excluded_entity_types : list, optional
-        A list of all NER types that are ignored for the replacement.
-
-    entity_id : int, optional
-        The entity index to start with (default: 1).
+    entities : list
+        Entities (or filtered entities) obtained from the get_entities method in which the first token of each entity
+        has a 'label' attribute (for example obtained by the cluster_entities method).
 
     Returns
     -------
@@ -153,19 +149,13 @@ def replace_entities(tokens, allowed_entity_types=None, excluded_entity_types=No
         List of tokens in which the head token of an entity is replaced by an entity marker ("@entity...") and the
         remaining entity tokens are emptied. The entity marker head token also gets an additional field "entity" which
         is the text of entity mention.
-    int
-        The maximum found entity index.
+    dict
+        The entities enriched with a label attribute.
     """
+    entities = entities  # type: list
     tokens = list(tokens)
-    entities = get_entities(tokens)
-    entities = [entity for entity in entities if
-                len(entity) > 0 and
-                (allowed_entity_types is None or entity[0]['ner'] in allowed_entity_types) and
-                (excluded_entity_types is None or entity[0]['ner'] not in excluded_entity_types)]
-    max_entity_id = entity_id
-    for entity in entities:
-        max_entity_id = entity_id
-        label = '@entity%d' % entity_id
+    for entity_index, entity in enumerate(entities):
+        label = entity[0]['label']
         start_index = entity[0]['index']
         end_index = entity[-1]['index']
         sentence = entity[0]['sentence']
@@ -174,49 +164,123 @@ def replace_entities(tokens, allowed_entity_types=None, excluded_entity_types=No
                 if token['index'] == start_index:
                     tokens[token_index]['entity'] = tokens_to_text(entity)
                 tokens[token_index]['word'] = label if token['index'] == start_index else ''
-        entity_id += 1
+        for token_index, token in enumerate(entities[entity_index]):
+            entities[entity_index][token_index]['label'] = label
 
-    return tokens, max_entity_id
+    return tokens, entities
 
 
-def replace_corefs(corenlp_data, tokens, entity_id):
-    """Replace entities by entity markers
+def normalize_entity(entity_text):
+    """Normalize the string representation of entities such that it can be used for string comparisons.
 
     Parameters
     ----------
-    corenlp_data : dict
-        The output of the Stanford CoreNLP client.
+    entity_text : str
+        Entity text to normalize.
 
-    tokens : list
-        Tokens found by the corenlp_to_tokens method..
+    Returns
+    -------
+    str
+        Normalized text (lower-cased, replaced special characters [á à ã ...] -> a and removed non-alphabetic
+        characters).
+    """
+    entity = entity_text.lower()
+    entity = unidecode.unidecode(entity)
+    entity = re.sub('[^a-z]', '', entity)
+    return entity
 
-    entity_id : int, optional
-        The entity index to start with (default: 1).
+
+def align_entities(entity_labels, entities):
+    """Align entities.
+
+    Parameters
+    ----------
+    entity_labels : list
+        String representations of the entities to align.
+    entities : list
+        List of entities obtained by the get_entities method.
 
     Returns
     -------
     list
-        List of tokens in which the head token of an entity is replaced by an entity marker ("@entity...") and the
-        remaining entity tokens are emptied. The entity marker head token also gets an additional field "entity" which
-        is the text of entity mention. Entities from the same coreference resolution cluster are assigned the same
-        label.
-    int
-        The maximum found entity index.
+        List of entities enriched in which the tokens of an entity are enriched with an 'aligned_with' field which maps
+        to one of the labels specified in the entity_labels list whenever the normalized entity string representation
+        matches the normalized label.
     """
-    max_entity_id = entity_id
-    tokens = list(tokens)
-    for cluster in corenlp_data['corefs']:
-        max_entity_id = entity_id
-        for entity in corenlp_data['corefs'][cluster]:
-            start_index = entity['startIndex']
-            end_index = entity['endIndex']
-            sentence = entity['sentNum']
-            label = '@%s%d' % ('entity', entity_id)
-            for token_index, token in enumerate(tokens):
-                if start_index <= token['index'] < end_index and token['sentence'] == sentence:
-                    if token['index'] == start_index:
-                        tokens[token_index]['entity'] = tokens_to_text(entity)
-                    tokens[token_index]['word'] = label if token['index'] == entity['startIndex'] else ''
-        entity_id += 1
+    entities = entities  # type: list
+    for index, nlp_entity in enumerate(entities):
+        text = tokens_to_text(nlp_entity)
+        for entity_label in entity_labels:
+            if normalize_entity(text) == normalize_entity(entity_label):
+                for subindex, token in enumerate(nlp_entity):
+                    entities[index][subindex]['aligned_with'] = entity_label
+    return entities
 
-    return tokens, max_entity_id
+
+def get_entity_windows(entity, tokens, pre_window_size=15, post_window_size=15, pad_token='<PAD>',
+                       replace_by_target=True):
+    """Get a list of windows in which each window is a list of tokens centered around the token of the specified entity.
+
+    Parameters
+    ----------
+    entity : dict
+        An entity (one of the entities obtained by the get_entities method).
+    tokens : list
+        Tokens (obtained by the corenlp_to_tokens method.
+    pre_window_size : int, optional
+        Number of tokens before the entity token (default: 15).
+    post_window_size : int, optional
+        Number of tokens after the entity token (default: 15).
+    pad_token : str, optional
+        The PAD token (used for filling up empty space, default: '<PAD>').
+    replace_by_target : bool, optional
+        When true, then the word attribute of tokens equal to the word attribute of the specified entity is replaced by
+        '@target' (default: True).
+
+    Returns
+    -------
+    list
+        A list of windows (in which a window is a list of tokens containing the entity token).
+    """
+    entity_label = entity[0]['label']
+    windows = []
+    for token_index, token in enumerate(tokens):
+        if token['word'] == entity_label:
+            pre_window = tokens[token_index - pre_window_size:token_index]
+            post_window = tokens[token_index + 1:token_index + 1 + post_window_size]
+            pre_window = max(0, pre_window_size - len(pre_window)) * [pad_token] + pre_window
+            post_window = post_window + max(0, post_window_size - len(post_window)) * [pad_token]
+            window = pre_window + [token] + post_window
+            window = [{key: value for key, value in token.items()} for token in window]
+            if replace_by_target:
+                for window_index, window_token in enumerate(window):
+                    window_token = window_token  # type: dict
+                    if window_token['word'] == entity_label:
+                        window[window_index]['word'] = '@target'
+            windows.append(window)
+    return windows
+
+
+def cluster_entities(entities):
+    """Cluster similar entities together such that they have the same 'label' attribute.
+
+    Parameters
+    ----------
+    entities : list
+        List of entities (obtained by the get_entities method).
+
+    Returns
+    -------
+    list
+        List of entities having a 'label' attribute in which entities which equivalent normalized word representations
+        get the same label.
+    """
+    current_index = 1
+    for index, entity in enumerate(entities):
+        entity[0]['label'] = '@entity%d' % current_index
+        current_index += 1
+    for index1, entity1 in enumerate(entities):
+        for index2, entity2 in enumerate(entities[index1 + 1:]):
+            if normalize_entity(tokens_to_text(entity2)) == normalize_entity(tokens_to_text(entity1)):
+                entity2[0]['label'] = entity1[0]['label']
+    return entities
