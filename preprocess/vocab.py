@@ -2,4 +2,4 @@ VOCAB_POSTAGS = ['<PAD>', '<UNK>', 'CC', 'CD', 'DT', 'EX', 'FW', 'IN', 'JJ', 'JJ
                  'NNP', 'NNPS', 'PDT', 'POS', 'PRP', 'PRP$', 'RB', 'RBR', 'RBS', 'RP', 'SYM', 'TO', 'UH', 'VB', 'VBD',
                  'VBG', 'VBN', 'VBP', 'VBZ', 'WDT', 'WP', 'WP$', 'WRB']
 
-VOCAB_ENTITIES = ['<PAD>'], ['@target'] + ['@entity%d' % i for i in range(1, 128)]
+VOCAB_ENTITIES = ['<PAD>'] + ['@target'] + ['@entity%d' % i for i in range(1, 128)]

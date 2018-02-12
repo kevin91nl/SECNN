@@ -2,10 +2,19 @@ import argparse
 import csv
 import os
 
+import chainer
 import numpy as np
 import pandas as pd
+from chainer import training
+from chainer.datasets import TransformDataset, split_dataset
+from chainer.iterators import SerialIterator
+from chainer.training import extensions
 
-from preprocess import *
+from model.secnn import SECNN, SECNNLossWrapper
+from preprocess import Preprocessor
+from preprocess.files import JSONFileLoader
+from preprocess.tokens import Tokenizer
+from preprocess.vocab import *
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
@@ -14,14 +23,15 @@ if __name__ == '__main__':
                         help='Path to the input files (folder containing preprocessed JSON files).')
     parser.add_argument('glove_file',
                         help='Path to the GloVe word embeddings file.')
+    parser.add_argument('--resume', '-r', default='',
+                        help='Resume the training from snapshot.')
+    parser.add_argument('--test_size', default=5, type=int,
+                        help='Number of test documents used for validation.')
     args = parser.parse_args()
 
-    ########################
-    # Load word embeddings #
-    ########################
-
-    # Load the GloVe file
     df_words = pd.read_table(args.glove_file, sep=' ', index_col=0, header=None, quoting=csv.QUOTE_NONE)
+
+    ####################################################################################################################
 
     # Load the vocabulary and the weight matrix
     VOCAB_WORDS = df_words.index.values.tolist()
@@ -38,30 +48,49 @@ if __name__ == '__main__':
     VOCAB_WORDS = ['<PAD>', '<UNK>'] + VOCAB_WORDS
     W_words = np.vstack([markers_matrix, W_words])
 
-    #########################
-    # Load train/test files #
-    #########################
+    # Convert vocab lists to dictionaries
+    VOCAB_WORDS = {word: index for index, word in enumerate(VOCAB_WORDS)}
+    VOCAB_POSTAGS = {postag: index for index, postag in enumerate(VOCAB_POSTAGS)}
+    VOCAB_ENTITIES = {entity: index for index, entity in enumerate(VOCAB_ENTITIES)}
 
-    files = os.listdir(args.input)
-    for file in files[:1]:
-        path = os.path.join(args.input, file)
-        with open(path, 'r') as file_handle:
-            data = json.load(file_handle)
+    ####################################################################################################################
 
-            # Preprocess the data
-            tokens = corenlp_to_tokens(data['nlp_data'])
-            entities = get_entities(tokens)
-            entities = align_entities(data['salient_entities'] + data['nonsalient_entities'], entities)
-            for index, entity in enumerate(entities):
-                entity[0]['is_salient'] = entity[0]['aligned_with'] in data['salient_entities'] if 'aligned_with' in \
-                                                                                                   entity[0] else False
+    tokenizer = Tokenizer(vocab_words=VOCAB_WORDS, vocab_postags=VOCAB_POSTAGS, vocab_entities=VOCAB_ENTITIES)
+    preprocessor = Preprocessor(tokenizer)
 
-            # Only use aligned entities
-            entities = [entity for entity in entities if len(entity) > 0 and 'aligned_with' in entity[0].keys()]
-            entities = cluster_entities(entities)
-            tokens, entities = replace_entities(tokens, entities)
+    files = [os.path.join(args.input, file) for file in os.listdir(args.input)]
 
-            # Fetch all entity windows
-            entity_windows = {entity[0]['label']: [] for entity in entities}
-            for entity in entities:
-                entity_windows[entity[0]['label']] = get_entity_windows(entity, tokens, replace_by_target=True)
+    file_loader = JSONFileLoader(preprocessor)
+    dataset = TransformDataset(files, file_loader.load_file)
+    test_set, train_set = split_dataset(dataset, 1)
+
+    train_iter = SerialIterator(train_set, batch_size=1, repeat=True, shuffle=True)
+    test_iter = SerialIterator(test_set[:args.test_size], batch_size=args.test_size, repeat=False, shuffle=False)
+
+    model = SECNN(
+        config_word={'in_size': W_words.shape[0], 'out_size': W_words.shape[1], 'initialW': W_words},
+        config_postag={'in_size': len(VOCAB_POSTAGS), 'out_size': 32},
+        config_entity={'in_size': len(VOCAB_ENTITIES), 'out_size': 32},
+        config_rnn={'in_size': None, 'out_size': 64},
+        config_affine={'in_size': None, 'out_size': 1},
+    )
+    loss_model = SECNNLossWrapper(model)
+    model.embed_word.disable_update()
+
+    optimizer = chainer.optimizers.SGD()
+    optimizer.setup(model)
+
+    updater = training.StandardUpdater(train_iter, optimizer=optimizer, converter=lambda *arguments: arguments[0],
+                                       loss_func=loss_model.__call__, device=-1)
+    trainer = training.Trainer(updater, (1, 'epoch'), out='result')
+    trainer.extend(extensions.Evaluator(test_iter, loss_model, converter=lambda *arguments: arguments[0]),
+                   trigger=(5, 'iteration'))
+    trainer.extend(extensions.LogReport(trigger=(5, 'iteration')))
+    trainer.extend(extensions.PrintReport(['epoch', 'iteration', 'loss']))
+    trainer.extend(extensions.ProgressBar())
+    trainer.extend(extensions.snapshot(), trigger=(100, 'iteration'))
+
+    if args.resume:
+        chainer.serializers.load_npz(args.resume, trainer)
+
+    trainer.run()

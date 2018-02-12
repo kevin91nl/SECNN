@@ -244,6 +244,10 @@ def get_entity_windows(entity, tokens, pre_window_size=15, post_window_size=15, 
     """
     entity_label = entity[0]['label']
     windows = []
+    pad_token = {
+        'word': pad_token,
+        'pos': pad_token
+    }
     for token_index, token in enumerate(tokens):
         if token['word'] == entity_label:
             pre_window = tokens[token_index - pre_window_size:token_index]
@@ -251,6 +255,9 @@ def get_entity_windows(entity, tokens, pre_window_size=15, post_window_size=15, 
             pre_window = max(0, pre_window_size - len(pre_window)) * [pad_token] + pre_window
             post_window = post_window + max(0, post_window_size - len(post_window)) * [pad_token]
             window = pre_window + [token] + post_window
+            for window_token in window:
+                if type(window_token) != dict:
+                    raise ValueError(window_token)
             window = [{key: value for key, value in token.items()} for token in window]
             if replace_by_target:
                 for window_index, window_token in enumerate(window):
@@ -284,3 +291,76 @@ def cluster_entities(entities):
             if normalize_entity(tokens_to_text(entity2)) == normalize_entity(tokens_to_text(entity1)):
                 entity2[0]['label'] = entity1[0]['label']
     return entities
+
+
+class Preprocessor:
+    """The preprocess class that applies the preprocess pipeline.
+    """
+
+    def __init__(self, tokenizer):
+        self.tokenizer = tokenizer
+
+    def __call__(self, data):
+        """Apply the preprocessing pipeline on data found in the input JSON files.
+
+        Parameters
+        ----------
+        data : dict
+            Contents of a JSON input file.
+
+        Returns
+        -------
+        dict
+            A dictionary containing the following keys:
+            - entities : list
+                A list of entities.
+            - document : dict
+                A mapping (dict) from entities to entity windows.
+            - targets : dict, optional
+                When available, targets is a mapping (dict) from entities to booleans where True means that the entity
+                is salient and False means that the entity is not salient.
+        """
+
+        # Preprocess the data
+        tokens = corenlp_to_tokens(data['nlp_data'])
+        entities = get_entities(tokens)
+        if 'salient_entities' in data.keys():
+            if 'nonsalient_entities' not in data.keys():
+                data['nonsalient_entities'] = []
+            entities = align_entities(data['salient_entities'] + data['nonsalient_entities'], entities)
+            for index, entity in enumerate(entities):
+                entity[0]['is_salient'] = entity[0]['aligned_with'] in data['salient_entities'] if 'aligned_with' in \
+                                                                                                   entity[0] else False
+
+        # Only use aligned entities
+        entities = [entity for entity in entities if len(entity) > 0 and ('aligned_with' in entity[0].keys() or (
+                'salient_entities' not in data.keys() and 'nonsalient_entities' not in data.keys()))]
+        entities = cluster_entities(entities)
+        tokens, entities = replace_entities(tokens, entities)
+
+        # Fetch all entity windows
+        entity_windows = {entity[0]['label']: [] for entity in entities}
+        for entity in entities:
+            entity_windows[entity[0]['label']] = get_entity_windows(entity, tokens, replace_by_target=True)
+
+        # Convert tokens to vectors
+        document = self.tokenizer.tokenize_document(entity_windows)
+
+        # Figure out the targets
+        targets = {}
+        for entity in entities:
+            if 'is_salient' in entity[0].keys():
+                targets[entity[0]['label']] = 1. if entity[0]['is_salient'] else 0.
+
+        if len(targets) > 0:
+            return {
+                'entities': entities,
+                'document': document,
+                'targets': targets
+            }
+        else:
+            return {
+                'entities': entities,
+                'document': document,
+                'targets': {}
+            }
