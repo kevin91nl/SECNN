@@ -35,3 +35,17 @@ This is the basic structure of the input files. There are required preprocessing
 ### NLP pipeline
 
 One required preprocessing step is annotating the data with the annotations found by the Stanford CorenLP package. This is done by executing the `preprocess_nlp.py` script. As input, it needs the path to the folder in which the JSON files are stored. It will not modify the existing fields, but only add the annotations in the `nlp_data` field. Make sure that the Stanford CoreNLP server is running. If the server is running on a different URL than `http://localhost:9000`, make sure to adjust the `corenlp_url` argument of the script accordingly.
+
+## Training
+
+After the preprocessing is done, the JSON files are used as input for the train script. The train script is called as follows:
+
+```
+python train.py
+```
+
+By default, the log file and snapshots are created in the `result` folder. It is possible to resume from a given snapshot by specifying the `result` argument. The documentation for the arguments are found by calling the help function:
+
+```
+python train.py --help
+```
