@@ -25,6 +25,14 @@ if __name__ == '__main__':
                         help='Resume the training from snapshot.')
     parser.add_argument('--test_size', default=5, type=int,
                         help='Number of test documents used for validation.')
+    parser.add_argument('--snapshot_iterations', default=100, type=int,
+                        help='Number of iterations after which a snapshot is created.')
+    parser.add_argument('--log_iterations', default=5, type=int,
+                        help='Number of iterations after which log lines are written.')
+    parser.add_argument('--validation_iterations', default=5, type=int,
+                        help='Number of iterations after which the model is evaluated on the test set.')
+    parser.add_argument('--epochs', default=1, type=int,
+                        help='Number of epochs used for the training.')
     args = parser.parse_args()
 
     # Convert vocab lists to dictionaries
@@ -66,13 +74,13 @@ if __name__ == '__main__':
     # Create the updater and trainer
     updater = training.StandardUpdater(train_iter, optimizer=optimizer, converter=lambda *arguments: arguments[0],
                                        loss_func=loss_model.__call__, device=-1)
-    trainer = training.Trainer(updater, (1, 'epoch'), out='result')
+    trainer = training.Trainer(updater, (args.epochs, 'epoch'), out='result')
     trainer.extend(extensions.Evaluator(test_iter, loss_model, converter=lambda *arguments: arguments[0]),
-                   trigger=(5, 'iteration'))
-    trainer.extend(extensions.LogReport(trigger=(5, 'iteration')))
+                   trigger=(args.validation_iterations, 'iteration'))
+    trainer.extend(extensions.LogReport(trigger=(args.log_iterations, 'iteration')))
     trainer.extend(extensions.PrintReport(['epoch', 'iteration', 'loss']))
     trainer.extend(extensions.ProgressBar())
-    trainer.extend(extensions.snapshot(), trigger=(100, 'iteration'))
+    trainer.extend(extensions.snapshot(), trigger=(args.snapshot_iterations, 'iteration'))
 
     # Resume from a specified snapshot
     if args.resume:
