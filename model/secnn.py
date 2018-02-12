@@ -3,8 +3,6 @@ import chainer.links as L
 import numpy as np
 from chainer import Chain, report
 
-from utils.neural_network import DummyLoss
-
 
 class SECNN(Chain):
 
@@ -65,9 +63,6 @@ class SECNNLossWrapper(Chain):
                 target = targets[doc_index][entity]
 
                 losses.append((target - y_out) ** 2)
-
-        if len(losses) == 0:
-            return DummyLoss()
 
         loss = F.mean(F.concat(losses))
 
